@@ -22,10 +22,11 @@ devtools::install()
 
 install.packages("remotes")
 remotes::install_github("wahyupsy/EquatingTKA")
+
 devtools::document()
 devtools::check()
 
-
+devtools::install(force = TRUE)
 
 fd <- "D:/OneDrive/Bahan Analisis/Tabel Parameter"
 
@@ -40,17 +41,13 @@ fd <- "D:/OneDrive/Bahan Analisis/Tabel Parameter"
 list.param <- list.files(path=fd, pattern="item", full.names=TRUE)
 list.param
 
-
+system("git status")
 remotes::install_github("wahyupsy/EquatingTKA", force=TRUE)
 library(EquatingTKA)
 jenjang <- c("SD", "SMP")
 mapel <- c("Lit", "Num")
 
 res.irt <- equating.sirt(fd)
-res.irt[[1]]
 res.sns <- equating.sns(fd)
-
-hasil.plink <- equating.plink(fd,threshold =1)
-hasil.plink[[1]]
-hasil <- equating.direc(fd, threshold =2)
-hasil[[1]]
+hasil.plink <- equating.plink(fd)
+hasil <- equating.direc(fd)

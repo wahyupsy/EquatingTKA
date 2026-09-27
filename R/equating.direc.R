@@ -178,6 +178,6 @@ equating.direc <- function(fd, threshold = 0.5) {
       hasil.2426 = hasil.2426
     )
   )
-
+   print(hasil)
   return(hasil)
 }
