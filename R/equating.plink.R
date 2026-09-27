@@ -163,6 +163,6 @@ equating.plink <- function(fd, threshold = 0.5) {
     list(hasil.2425 = hasil.2425, hasil.2426 = hasil.2426)
   )
 
-  print(hasil)
+  print(rangkuman)
   return(hasil)
 }
