@@ -155,7 +155,10 @@ equating.plink <- function(fd, threshold = 0.5) {
   }
 
   rangkuman <- rangkuman[,1:8]
+  rownames(rangkuman) <- NULL
 
+  cat("\n\n===== RANGKUMAN HASIL EQUATING =====\n\n")
+  print(rangkuman, row.names = FALSE)
   rownames(rangkuman) <- NULL
 
   hasil <- list(

@@ -171,13 +171,16 @@ equating.direc <- function(fd, threshold = 0.5) {
 
   rownames(hasil_equating) <- NULL
 
+  cat("\n\n===== RANGKUMAN HASIL EQUATING =====\n\n")
+  print(hasil_equating, row.names = FALSE)
+
   hasil <- list(
-    hasil_equating,
-    list(
+    rangkuman = hasil_equating,
+    detail = list(
       hasil.2425 = hasil.2425,
       hasil.2426 = hasil.2426
     )
   )
-   print(hasil)
+
   return(hasil)
 }
