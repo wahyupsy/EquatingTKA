@@ -1,0 +1,33 @@
+\name{equating.irt}
+\alias{equating.irt}
+\title{Equating IRT untuk Multiple Years (2024, 2025, 2026)}
+\usage{
+equating.irt(fd)
+}
+\arguments{
+\item{fd}{Karakter. Path folder tempat menyimpan file CSV parameter item.}
+}
+\value{
+Mengembalikan sebuah list:
+\item{hasil_equating}{Data frame ringkasan koefisien equating (Mean-Mean, Haebara, Stocking-Lord).}
+\item{detail}{List berisi objek modIRT dan detail item jangkar untuk analisis lebih lanjut.}
+}
+\description{
+Fungsi ini melakukan proses equating IRT menggunakan metode Mean-Mean, Haebara, dan Stocking-Lord 
+untuk membandingkan parameter butir antar tahun (2024-2025 dan 2024-2026) berdasarkan jenjang (SD/SMP) 
+dan mata pelajaran (Literasi/Numerasi).
+}
+\details{
+Fungsi ini secara otomatis melakukan filter file berdasarkan penamaan spesifik (_24, _25, _26) 
+dan menghitung nilai pergeseran (B estimate) menggunakan package \code{equateIRT}.
+}
+\note{
+Pastikan kolom pada CSV memiliki nama 'NAME' dan 'MEASURE'.
+}
+\examples{
+\dontrun{
+equating.irt("C:/Data/Parameter")
+}
+}
+\keyword{equating}
+\keyword{irt}
