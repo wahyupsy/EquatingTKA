@@ -1,3 +1,21 @@
+#' Equating IRT menggunakan paket plink
+#'
+#' Menghitung konstanta equating 2024-2025 dan 2024-2026 untuk setiap
+#' kombinasi jenjang (SD, SMP) dan mapel (Lit, Num) dengan metode
+#' Mean-Mean, Mean-Sigma, Haebara, dan Stocking-Lord.
+#'
+#' @param fd Folder yang berisi file parameter item.
+#' @param threshold Batas praktis displacement (logit) untuk purification anchor.
+#' @param purification TRUE = buang item anchor yang displace (2*SE & > threshold);
+#'   FALSE = pakai semua common item tanpa purifikasi.
+#' @return List dengan elemen:
+#' \describe{
+#'   \item{rangkuman}{data.frame konstanta B (Mean-Mean, Mean-Sigma, Haebara, Stocking-Lord) per pasangan tahun dan kombinasi.}
+#'   \item{list.anchor}{list gabungan item anchor per pasangan tahun (sebelum purifikasi).}
+#'   \item{detail}{list hasil detail \code{hasil.2425} dan \code{hasil.2426}, berisi parameter anchor, tabel displacement, model plink, serta konstanta A dan B.}
+#' }
+#' @importFrom plink as.poly.mod as.irt.pars plink link.pars
+#' @export
 equating.plink <- function(fd, threshold = 0.5, purification = TRUE) {
 
   list.param.file <- list.files(path = fd, pattern = "item", full.names = TRUE)
@@ -22,10 +40,8 @@ equating.plink <- function(fd, threshold = 0.5, purification = TRUE) {
         f25K <- grep(jenjang[j], grep(mapel[k], grep("_25", list.param.file, value = TRUE), value = TRUE), value = TRUE)
         f26K <- grep(jenjang[j], grep(mapel[k], grep("_26", list.param.file, value = TRUE), value = TRUE), value = TRUE)
 
-        if (length(f24K) == 0 || length(f25K) == 0 || length(f26K) == 0) {
-          warning(paste("File tidak lengkap untuk", nm))
-          next
-        }
+        if (length(f24K) == 0 || length(f25K) == 0 || length(f26K) == 0)
+          stop("File tidak lengkap untuk ", nm)
 
         par.24 <- read.csv(f24K[1], skip = 1, stringsAsFactors = FALSE)
         par.list <- list("25" = read.csv(f25K[1], skip = 1, stringsAsFactors = FALSE),
@@ -142,14 +158,9 @@ equating.plink <- function(fd, threshold = 0.5, purification = TRUE) {
   cat("\n\n===== RANGKUMAN HASIL EQUATING =====\n\n")
   print(rangkuman, row.names = FALSE)
 
-  hasil <- list(
+  list(
     rangkuman = rangkuman,
     list.anchor = list.anchor,
-    detail = list(
-      hasil.2425 = hasil.2425,
-      hasil.2426 = hasil.2426
-    )
+    detail = list(hasil.2425 = hasil.2425, hasil.2426 = hasil.2426)
   )
-
-  return(hasil)
 }

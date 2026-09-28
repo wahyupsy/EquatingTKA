@@ -1,3 +1,22 @@
+#' Equating IRT menggunakan paket sirt
+#'
+#' Menghitung konstanta equating (B) untuk pasangan tahun 2024-2025 dan 2024-2026
+#' menggunakan metode Rasch Equating dari paket \code{sirt}. Fungsi ini juga menyediakan
+#' statistik deskriptif seperti Standar Deviasi, Varians, dan Link Error.
+#'
+#' @param fd Karakter. Path folder yang berisi file parameter item (.csv).
+#' @param threshold Numerik. Batas absolut displacement (logit) untuk purifikasi anchor. Default 0.5.
+#' @param purification Logikal. Jika TRUE, item dengan displacement > 2*SE dan > threshold akan dibuang.
+#'
+#' @return List berisi:
+#' \describe{
+#'   \item{rangkuman}{Data frame ringkasan konstanta B (Mean-Mean, Haebara, Stocking-Lord) serta indikator kualitas penyetaraan (SD, Var, linkerror).}
+#'   \item{list.anchor}{List data frame item anchor sebelum purifikasi untuk setiap kombinasi.}
+#'   \item{detail}{List berisi detail hasil per pasangan tahun (24-25 dan 24-26), termasuk tabel displacement dan objek model \code{sirt}.}
+#' }
+#'
+#' @importFrom sirt equating.rasch
+#' @export
 equating.sirt <- function(fd, threshold = 0.5, purification = TRUE) {
 
   list.param.file <- list.files(path = fd, pattern = "item", full.names = TRUE)
@@ -34,6 +53,9 @@ equating.sirt <- function(fd, threshold = 0.5, purification = TRUE) {
         f24K <- grep(mapel[k], grep(jenjang[j], grep("_24", list.param.file, value = TRUE), value = TRUE), value = TRUE)
         f25K <- grep(mapel[k], grep(jenjang[j], grep("_25", list.param.file, value = TRUE), value = TRUE), value = TRUE)
         f26K <- grep(mapel[k], grep(jenjang[j], grep("_26", list.param.file, value = TRUE), value = TRUE), value = TRUE)
+
+        if (length(f24K) == 0 || length(f25K) == 0 || length(f26K) == 0)
+          stop("File tidak lengkap untuk ", nm)
 
         par.24 <- read.csv(f24K[1], skip = 1)
         par.list <- list("25" = read.csv(f25K[1], skip = 1),
@@ -78,6 +100,7 @@ equating.sirt <- function(fd, threshold = 0.5, purification = TRUE) {
           mm <- hb <- sl <- sdv <- vr <- le <- NA_real_
 
           if (n_bersih >= 2) {
+            # Menggunakan sirt::equating.rasch
             mod <- sirt::equating.rasch(x = d1[, c("item", "param")], y = d2[, c("item", "param")])
             mm <- mod$B.est["Mean.Mean"]
             hb <- mod$B.est["Haebara"]
@@ -126,16 +149,12 @@ equating.sirt <- function(fd, threshold = 0.5, purification = TRUE) {
   }
 
   rownames(rangkuman) <- NULL
+  cat("\n\n===== RANGKUMAN HASIL EQUATING (SIRT) =====\n\n")
   print(rangkuman, row.names = FALSE)
 
-  hasil <- list(
+  return(list(
     rangkuman = rangkuman,
     list.anchor = list.anchor,
-    detail = list(
-      hasil.2425 = hasil.2425,
-      hasil.2426 = hasil.2426
-    )
-  )
-
-  return(hasil)
+    detail = list(hasil.2425 = hasil.2425, hasil.2426 = hasil.2426)
+  ))
 }
