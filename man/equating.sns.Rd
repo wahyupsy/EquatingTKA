@@ -2,21 +2,20 @@
 % Please edit documentation in R/equating.sns.R
 \name{equating.sns}
 \alias{equating.sns}
-\title{Three-Year IRT Equating with Anchor Item Purification}
+\title{Three-Year IRT Equating with Anchor Item Purification (SNSequate)}
 \usage{
-equating.sns(fd, threshold = 0.5)
+equating.sns(fd, threshold = 0.5, purification = TRUE)
 }
 \arguments{
-\item{fd}{Folder containing item parameter files.}
+\item{fd}{Folder path containing item parameter files.}
 
-\item{threshold}{Maximum absolute difference in item difficulty
-allowed during anchor purification.}
+\item{threshold}{Maximum displacement threshold allowed for anchor items.}
+
+\item{purification}{Logical. Perform anchor item purification if TRUE.}
 }
 \value{
-A data frame containing the equating results for
-2024-2025 and 2024-2026.
+A list containing summary table, anchor details, and raw irt.link models.
 }
 \description{
-Performs 1PL IRT equating between 2024-2025 and 2024-2026
-using Mean-Mean, Haebara, and Stocking-Lord methods.
+Three-Year IRT Equating with Anchor Item Purification (SNSequate)
 }

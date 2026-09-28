@@ -1,171 +1,155 @@
-#' Three-Year IRT Equating using PLINK
-#'
-#' Performs IRT equating between 2024-2025 and 2024-2026
-#' using Mean/Mean, Mean/Sigma, Haebara, and Stocking-Lord methods.
-#'
-#' @param fd Folder containing item parameter files.
-#' @param threshold Maximum absolute difference in item difficulty
-#'   allowed during anchor purification.
-#'
-#' @return A list containing summary and detailed equating results.
-#'
-#' @importFrom plink as.poly.mod as.irt.pars plink
-#' @export
-equating.plink <- function(fd, threshold = 0.5) {
+equating.plink <- function(fd, threshold = 0.5, purification = TRUE) {
+
   list.param.file <- list.files(path = fd, pattern = "item", full.names = TRUE)
   jenjang <- c("SD", "SMP")
   mapel <- c("Lit", "Num")
+
   rangkuman <- data.frame()
   hasil.2425 <- list()
   hasil.2426 <- list()
-
-  clean_param_df <- function(df) {
-    data.frame(item = as.character(df$NAME),
-               param = as.numeric(as.character(df$MEASURE)),
-               stringsAsFactors = FALSE)
-  }
-
-  process_pair <- function(df1, df2, nama_pasang, label_kombinasi) {
-    common_items <- intersect(df1$item, df2$item)
-    n_awal <- length(common_items)
-
-    if (n_awal < 2) {
-      return(list(
-        summary = data.frame(
-          Equating = nama_pasang, Kombinasi = label_kombinasi,
-          items = n_awal, items.cut = n_awal,
-          Mean.Mean = NA_real_, Mean.Sigma = NA_real_,
-          Haebara = NA_real_, Stocking.Lord = NA_real_,
-          A_Mean.Mean = NA_real_, A_Mean.Sigma = NA_real_,
-          A_Haebara = NA_real_, A_Stocking.Lord = NA_real_,
-          stringsAsFactors = FALSE
-        ),
-        model = NULL,
-        common.item = common_items
-      ))
-    }
-
-    d1 <- df1[df1$item %in% common_items, , drop = FALSE]
-    d2 <- df2[df2$item %in% common_items, , drop = FALSE]
-    d1 <- d1[order(d1$item), , drop = FALSE]
-    d2 <- d2[order(d2$item), , drop = FALSE]
-
-    diff_b <- abs(d1$param - d2$param)
-    keep <- diff_b <= threshold
-    d1_clean <- d1[keep, , drop = FALSE]
-    d2_clean <- d2[keep, , drop = FALSE]
-    n_clean <- nrow(d1_clean)
-
-    if (n_clean < 2) {
-      return(list(
-        summary = data.frame(
-          Equating = nama_pasang, Kombinasi = label_kombinasi,
-          item= n_awal, item.cut= n_clean,
-          Mean.Mean = NA_real_, Mean.Sigma = NA_real_,
-          Haebara = NA_real_, Stocking.Lord = NA_real_,
-          A_Mean.Mean = NA_real_, A_Mean.Sigma = NA_real_,
-          A_Haebara = NA_real_, A_Stocking.Lord = NA_real_,
-          stringsAsFactors = FALSE
-        ),
-        model = NULL,
-        common.item = d1_clean$item
-      ))
-    }
-
-    I <- n_clean
-    pm <- plink::as.poly.mod(I)
-
-    plink.pars1 <- list(
-      study1 = data.frame(a = rep(1, I), b = d1_clean$param, c = rep(0, I)),
-      study2 = data.frame(a = rep(1, I), b = d2_clean$param, c = rep(0, I))
-    )
-
-    common.items <- cbind(study1 = 1:I, study2 = 1:I)
-    cats.item <- list(study1 = rep(2, I), study2 = rep(2, I))
-
-    x <- plink::as.irt.pars(
-      plink.pars1, common.items, cat = cats.item, poly.mod = list(pm, pm)
-    )
-
-    out <- plink::plink(x, rescale = "MS", base.grp = 1, D = 1.7)
-    constants <- out$link@constants
-
-    B.MM <- as.numeric(constants$MM["B"])
-    B.MS <- as.numeric(constants$MS["B"])
-    B.HB <- as.numeric(constants$HB["B"])
-    B.SL <- as.numeric(constants$SL["B"])
-    A.MM <- as.numeric(constants$MM["A"])
-    A.MS <- as.numeric(constants$MS["A"])
-    A.HB <- as.numeric(constants$HB["A"])
-    A.SL <- as.numeric(constants$SL["A"])
-
-    res_summary <- data.frame(
-      Equating = nama_pasang, Kombinasi = label_kombinasi,
-      item= n_awal, item.cut= n_clean,
-      Mean.Mean = round(B.MM, 4), Mean.Sigma = round(B.MS, 4),
-      Haebara = round(B.HB, 4), Stocking.Lord = round(B.SL, 4),
-      A_Mean.Mean = round(A.MM, 4), A_Mean.Sigma = round(A.MS, 4),
-      A_Haebara = round(A.HB, 4), A_Stocking.Lord = round(A.SL, 4),
-      stringsAsFactors = FALSE
-    )
-
-    return(list(
-      summary = res_summary,
-      model = out,
-      link.pars = plink::link.pars(out),
-      common.item = d1_clean$item,
-      par.1 = d1_clean,
-      par.2 = d2_clean
-    ))
-  }
+  list.anchor <- list()
+  sel_cols <- function(df) df[, c("NAME", "ENTRY", "MEASURE", "COUNT", "OBSMATCH")]
 
   for (j in seq_along(jenjang)) {
     for (k in seq_along(mapel)) {
+
       nm <- paste0(jenjang[j], "_", mapel[k])
       cat("\n===== Processing:", nm, "=====\n")
 
-      f24 <- grep("_24", list.param.file, value = TRUE)
-      f24K <- grep(jenjang[j], grep(mapel[k], f24, value = TRUE), value = TRUE)
-      f25 <- grep("_25", list.param.file, value = TRUE)
-      f25K <- grep(jenjang[j], grep(mapel[k], f25, value = TRUE), value = TRUE)
-      f26 <- grep("_26", list.param.file, value = TRUE)
-      f26K <- grep(jenjang[j], grep(mapel[k], f26, value = TRUE), value = TRUE)
+      tryCatch({
 
-      if (length(f24K) == 0 || length(f25K) == 0 || length(f26K) == 0) {
-        warning(paste("File tidak lengkap untuk", nm))
-        next
-      }
+        f24K <- grep(jenjang[j], grep(mapel[k], grep("_24", list.param.file, value = TRUE), value = TRUE), value = TRUE)
+        f25K <- grep(jenjang[j], grep(mapel[k], grep("_25", list.param.file, value = TRUE), value = TRUE), value = TRUE)
+        f26K <- grep(jenjang[j], grep(mapel[k], grep("_26", list.param.file, value = TRUE), value = TRUE), value = TRUE)
 
-      par24 <- read.csv(f24K[1], skip = 1, stringsAsFactors = FALSE)
-      par25 <- read.csv(f25K[1], skip = 1, stringsAsFactors = FALSE)
-      par26 <- read.csv(f26K[1], skip = 1, stringsAsFactors = FALSE)
+        if (length(f24K) == 0 || length(f25K) == 0 || length(f26K) == 0) {
+          warning(paste("File tidak lengkap untuk", nm))
+          next
+        }
 
-      par.24X <- clean_param_df(par24)
-      par.25X <- clean_param_df(par25)
-      par.26X <- clean_param_df(par26)
+        par.24 <- read.csv(f24K[1], skip = 1, stringsAsFactors = FALSE)
+        par.list <- list("25" = read.csv(f25K[1], skip = 1, stringsAsFactors = FALSE),
+                         "26" = read.csv(f26K[1], skip = 1, stringsAsFactors = FALSE))
 
-      res2425 <- process_pair(par.24X, par.25X, "2024-2025", nm)
-      hasil.2425[[nm]] <- res2425
+        par.24X <- data.frame(item = as.character(par.24$NAME),
+                              param = as.numeric(as.character(par.24$MEASURE)),
+                              se = as.numeric(as.character(par.24$ERROR)),
+                              stringsAsFactors = FALSE)
 
-      res2426 <- process_pair(par.24X, par.26X, "2024-2026", nm)
-      hasil.2426[[nm]] <- res2426
+        for (yr in c("25", "26")) {
 
-      rangkuman <- rbind(rangkuman, res2425$summary, res2426$summary)
+          p2 <- par.list[[yr]]
+          tahun <- paste0("2024-20", yr)
+
+          list.anchor[[paste0(nm, "24", yr)]] <- merge(
+            sel_cols(par.24), sel_cols(p2), by = "NAME", suffixes = c("24", yr)
+          )
+
+          d2X <- data.frame(item = as.character(p2$NAME),
+                            param = as.numeric(as.character(p2$MEASURE)),
+                            se = as.numeric(as.character(p2$ERROR)),
+                            stringsAsFactors = FALSE)
+
+          common <- intersect(par.24X$item, d2X$item)
+          n_awal <- length(common)
+
+          d1 <- par.24X[par.24X$item %in% common, ]
+          d2 <- d2X[d2X$item %in% common, ]
+          d1 <- d1[order(d1$item), ]
+          d2 <- d2[order(d2$item), ]
+
+          sepooled <- sqrt(d1$se^2 + d2$se^2)
+          displace <- d1$param - d2$param
+          flag <- abs(displace) > 2 * sepooled & abs(displace) > threshold
+          keep <- if (purification) !flag else rep(TRUE, length(flag))
+
+          displace_tbl <- data.frame(
+            item = d1$item, param24 = d1$param, param2 = d2$param,
+            displace = displace, sepooled = sepooled, flag = flag
+          )
+
+          d1 <- d1[keep, ]
+          d2 <- d2[keep, ]
+          n_bersih <- nrow(d1)
+
+          out <- NULL
+          lp <- NULL
+          B <- A <- c(MM = NA_real_, MS = NA_real_, HB = NA_real_, SL = NA_real_)
+
+          if (n_bersih >= 2) {
+            I <- n_bersih
+            pm <- plink::as.poly.mod(I)
+
+            plink.pars1 <- list(
+              study1 = data.frame(a = rep(1, I), b = d1$param, c = rep(0, I)),
+              study2 = data.frame(a = rep(1, I), b = d2$param, c = rep(0, I))
+            )
+
+            x <- plink::as.irt.pars(
+              plink.pars1,
+              cbind(study1 = 1:I, study2 = 1:I),
+              cat = list(study1 = rep(2, I), study2 = rep(2, I)),
+              poly.mod = list(pm, pm)
+            )
+
+            out <- plink::plink(x, rescale = "MS", base.grp = 1, D = 1.7)
+            lp <- plink::link.pars(out)
+            cons <- out$link@constants
+
+            B <- sapply(c("MM", "MS", "HB", "SL"), function(m) as.numeric(cons[[m]]["B"]))
+            A <- sapply(c("MM", "MS", "HB", "SL"), function(m) as.numeric(cons[[m]]["A"]))
+          }
+
+          res <- list(
+            par.24 = d1,
+            par.2 = d2,
+            common.item = d1$item,
+            displace_tbl = displace_tbl,
+            model = out,
+            link.pars = lp,
+            B = B,
+            A = A
+          )
+
+          if (yr == "25") hasil.2425[[nm]] <- res else hasil.2426[[nm]] <- res
+
+          rangkuman <- rbind(
+            rangkuman,
+            data.frame(
+              Equating = tahun,
+              Kombinasi = nm,
+              Anchor_Awal = n_awal,
+              Anchor_Bersih = n_bersih,
+              Mean.Mean = round(B["MM"], 4),
+              Mean.Sigma = round(B["MS"], 4),
+              Haebara = round(B["HB"], 4),
+              Stocking.Lord = round(B["SL"], 4),
+              row.names = NULL
+            )
+          )
+        }
+
+        cat("✓ Berhasil memproses", nm, "\n")
+
+      }, error = function(e) {
+        cat("❌ Gagal pada", nm, ":", e$message, "\n")
+      })
     }
   }
 
-  rangkuman <- rangkuman[,1:8]
   rownames(rangkuman) <- NULL
 
   cat("\n\n===== RANGKUMAN HASIL EQUATING =====\n\n")
   print(rangkuman, row.names = FALSE)
-  rownames(rangkuman) <- NULL
 
   hasil <- list(
-    rangkuman,
-    list(hasil.2425 = hasil.2425, hasil.2426 = hasil.2426)
+    rangkuman = rangkuman,
+    list.anchor = list.anchor,
+    detail = list(
+      hasil.2425 = hasil.2425,
+      hasil.2426 = hasil.2426
+    )
   )
 
-  print(rangkuman)
   return(hasil)
 }

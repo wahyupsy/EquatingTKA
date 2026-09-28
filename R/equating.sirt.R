@@ -1,36 +1,19 @@
-#' Equating parameter SIRT untuk tiga tahun
-#'
-#' Melakukan equating parameter 2024-2025 dan 2024-2026
-#' berdasarkan kombinasi jenjang dan mata pelajaran.
-#'
-#' @param fd Folder yang berisi file parameter.
-#'
-#' @return List dengan dua elemen:
-#'   \describe{
-#'     \item{hasil[[1]]}{Rangkuman hasil equating.}
-#'     \item{hasil[[2]]}{Hasil lengkap equating.}
-#'   }
-#'
-#' @importFrom sirt equating.rasch
-#' @export
-equating.sirt <- function(fd) {
+equating.sirt <- function(fd, threshold = 0.5, purification = TRUE) {
 
-  list.param.file <- list.files(
-    path = fd,
-    pattern = "item",
-    full.names = TRUE
-  )
-
+  list.param.file <- list.files(path = fd, pattern = "item", full.names = TRUE)
   jenjang <- c("SD", "SMP")
   mapel <- c("Lit", "Num")
 
   hasil.2425 <- list()
   hasil.2426 <- list()
+  list.anchor <- list()
+  sel_cols <- function(df) df[, c("NAME", "ENTRY", "MEASURE", "COUNT", "OBSMATCH")]
 
   rangkuman <- data.frame(
     Equating = character(),
     Kombinasi = character(),
-    Num_Anchor = numeric(),
+    Anchor_Awal = numeric(),
+    Anchor_Bersih = numeric(),
     Mean.Mean = numeric(),
     Haebara = numeric(),
     Stocking.Lord = numeric(),
@@ -44,190 +27,111 @@ equating.sirt <- function(fd) {
     for (k in seq_along(mapel)) {
 
       nm <- paste0(jenjang[j], "_", mapel[k])
-
       cat("\n===== Processing:", nm, "=====\n")
 
-      #=================================================
-      # FILE
-      #=================================================
+      tryCatch({
 
-      f24 <- grep("_24", list.param.file, value = TRUE)
-      f25 <- grep("_25", list.param.file, value = TRUE)
-      f26 <- grep("_26", list.param.file, value = TRUE)
+        f24K <- grep(mapel[k], grep(jenjang[j], grep("_24", list.param.file, value = TRUE), value = TRUE), value = TRUE)
+        f25K <- grep(mapel[k], grep(jenjang[j], grep("_25", list.param.file, value = TRUE), value = TRUE), value = TRUE)
+        f26K <- grep(mapel[k], grep(jenjang[j], grep("_26", list.param.file, value = TRUE), value = TRUE), value = TRUE)
 
-      f24K <- grep(
-        mapel[k],
-        grep(jenjang[j], f24, value = TRUE),
-        value = TRUE
-      )
+        par.24 <- read.csv(f24K[1], skip = 1)
+        par.list <- list("25" = read.csv(f25K[1], skip = 1),
+                         "26" = read.csv(f26K[1], skip = 1))
 
-      f25K <- grep(
-        mapel[k],
-        grep(jenjang[j], f25, value = TRUE),
-        value = TRUE
-      )
+        par.24X <- data.frame(item = par.24$NAME, param = par.24$MEASURE, se = par.24$ERROR)
 
-      f26K <- grep(
-        mapel[k],
-        grep(jenjang[j], f26, value = TRUE),
-        value = TRUE
-      )
+        for (yr in c("25", "26")) {
 
-      #=================================================
-      # READ PARAMETER
-      #=================================================
+          p2 <- par.list[[yr]]
+          tahun <- paste0("2024-20", yr)
 
-      par.24 <- read.csv(
-        f24K[1],
-        skip = 1
-      )
+          list.anchor[[paste0(nm, "24", yr)]] <- merge(
+            sel_cols(par.24), sel_cols(p2), by = "NAME", suffixes = c("24", yr)
+          )
 
-      par.25 <- read.csv(
-        f25K[1],
-        skip = 1
-      )
+          d2X <- data.frame(item = p2$NAME, param = p2$MEASURE, se = p2$ERROR)
 
-      par.26 <- read.csv(
-        f26K[1],
-        skip = 1
-      )
+          common <- intersect(par.24X$item, d2X$item)
+          n_awal <- length(common)
 
-      par.24X <- data.frame(
-        item = par.24$NAME,
-        param = par.24$MEASURE
-      )
+          d1 <- par.24X[par.24X$item %in% common, ]
+          d2 <- d2X[d2X$item %in% common, ]
+          d1 <- d1[order(d1$item), ]
+          d2 <- d2[order(d2$item), ]
 
-      par.25X <- data.frame(
-        item = par.25$NAME,
-        param = par.25$MEASURE
-      )
+          sepooled <- sqrt(d1$se^2 + d2$se^2)
+          displace <- d1$param - d2$param
+          flag <- abs(displace) > 2 * sepooled & abs(displace) > threshold
+          keep <- if (purification) !flag else rep(TRUE, length(flag))
 
-      par.26X <- data.frame(
-        item = par.26$NAME,
-        param = par.26$MEASURE
-      )
+          displace_tbl <- data.frame(
+            item = d1$item, param24 = d1$param, param2 = d2$param,
+            displace = displace, sepooled = sepooled, flag = flag
+          )
 
-      #=================================================
-      # COMMON ITEM
-      #=================================================
+          d1 <- d1[keep, ]
+          d2 <- d2[keep, ]
+          n_bersih <- nrow(d1)
 
-      common_2425 <- intersect(
-        par.24X$item,
-        par.25X$item
-      )
+          mod <- NULL
+          mm <- hb <- sl <- sdv <- vr <- le <- NA_real_
 
-      common_2426 <- intersect(
-        par.24X$item,
-        par.26X$item
-      )
+          if (n_bersih >= 2) {
+            mod <- sirt::equating.rasch(x = d1[, c("item", "param")], y = d2[, c("item", "param")])
+            mm <- mod$B.est["Mean.Mean"]
+            hb <- mod$B.est["Haebara"]
+            sl <- mod$B.est["Stocking.Lord"]
+            sdv <- mod$descriptives$SD
+            vr <- mod$descriptives$Var
+            le <- mod$descriptives$linkerror
+          }
 
-      #=================================================
-      # EQUATING 2024-2025
-      #=================================================
+          res <- list(
+            par.24 = d1,
+            par.2 = d2,
+            common.item = d1$item,
+            displace_tbl = displace_tbl,
+            model = mod,
+            Mean.Mean = mm,
+            Haebara = hb,
+            Stocking.Lord = sl
+          )
 
-      mod.2425 <- sirt::equating.rasch(
-        x = par.24X,
-        y = par.25X
-      )
+          if (yr == "25") hasil.2425[[nm]] <- res else hasil.2426[[nm]] <- res
 
-      mm_2425 <- mod.2425$B.est["Mean.Mean"]
-      hb_2425 <- mod.2425$B.est["Haebara"]
-      sl_2425 <- mod.2425$B.est["Stocking.Lord"]
+          rangkuman <- rbind(
+            rangkuman,
+            data.frame(
+              Equating = tahun,
+              Kombinasi = nm,
+              Anchor_Awal = n_awal,
+              Anchor_Bersih = n_bersih,
+              Mean.Mean = round(mm, 4),
+              Haebara = round(hb, 4),
+              Stocking.Lord = round(sl, 4),
+              SD = round(sdv, 4),
+              Var = round(vr, 4),
+              linkerror = round(le, 4)
+            )
+          )
+        }
 
-      desc_2425 <- mod.2425$descriptives
+        cat("✓ Berhasil memproses", nm, "\n")
 
-      #=================================================
-      # EQUATING 2024-2026
-      #=================================================
-
-      mod.2426 <- sirt::equating.rasch(
-        x = par.24X,
-        y = par.26X
-      )
-
-      mm_2426 <- mod.2426$B.est["Mean.Mean"]
-      hb_2426 <- mod.2426$B.est["Haebara"]
-      sl_2426 <- mod.2426$B.est["Stocking.Lord"]
-
-      desc_2426 <- mod.2426$descriptives
-
-      #=================================================
-      # SIMPAN HASIL 2024-2025
-      #=================================================
-
-      hasil.2425[[nm]] <- list(
-        par.24 = par.24X,
-        par.25 = par.25X,
-        common.item = common_2425,
-        model = mod.2425,
-        Mean.Mean = mm_2425,
-        Haebara = hb_2425,
-        Stocking.Lord = sl_2425
-      )
-
-      #=================================================
-      # SIMPAN HASIL 2024-2026
-      #=================================================
-
-      hasil.2426[[nm]] <- list(
-        par.24 = par.24X,
-        par.26 = par.26X,
-        common.item = common_2426,
-        model = mod.2426,
-        Mean.Mean = mm_2426,
-        Haebara = hb_2426,
-        Stocking.Lord = sl_2426
-      )
-
-      #=================================================
-      # RANGKUMAN 2024-2025
-      #=================================================
-
-      rangkuman <- rbind(
-        rangkuman,
-        data.frame(
-          Equating = "2024-2025",
-          Kombinasi = nm,
-          Num_Anchor = length(common_2425),
-          Mean.Mean = round(mm_2425, 4),
-          Haebara = round(hb_2425, 4),
-          Stocking.Lord = round(sl_2425, 4),
-          SD = round(desc_2425$SD, 4),
-          Var = round(desc_2425$Var, 4),
-          linkerror = round(desc_2425$linkerror, 4)
-        )
-      )
-
-      #=================================================
-      # RANGKUMAN 2024-2026
-      #=================================================
-
-      rangkuman <- rbind(
-        rangkuman,
-        data.frame(
-          Equating = "2024-2026",
-          Kombinasi = nm,
-          Num_Anchor = length(common_2426),
-          Mean.Mean = round(mm_2426, 4),
-          Haebara = round(hb_2426, 4),
-          Stocking.Lord = round(sl_2426, 4),
-          SD = round(desc_2426$SD, 4),
-          Var = round(desc_2426$Var, 4),
-          linkerror = round(desc_2426$linkerror, 4)
-        )
-      )
+      }, error = function(e) {
+        cat("❌ Gagal pada", nm, ":", e$message, "\n")
+      })
     }
   }
 
-  #=================================================
-  # OUTPUT
-  #=================================================
-
-  print(rangkuman)
+  rownames(rangkuman) <- NULL
+  print(rangkuman, row.names = FALSE)
 
   hasil <- list(
-    rangkuman,
-    list(
+    rangkuman = rangkuman,
+    list.anchor = list.anchor,
+    detail = list(
       hasil.2425 = hasil.2425,
       hasil.2426 = hasil.2426
     )

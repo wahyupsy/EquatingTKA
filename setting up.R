@@ -3,8 +3,8 @@
 library(roxygen2)
 library(devtools)
 library(dplyr)
-
-require(equateIRT)
+library(statmod)
+library(equateIRT)
 
 devtools::document()
 
@@ -43,11 +43,22 @@ list.param
 
 system("git status")
 remotes::install_github("wahyupsy/EquatingTKA", force=TRUE)
+
 library(EquatingTKA)
 jenjang <- c("SD", "SMP")
 mapel <- c("Lit", "Num")
 
-res.irt <- equating.sirt(fd)
-res.sns <- equating.sns(fd)
-hasil.plink <- equating.plink(fd)
-hasil <- equating.direc(fd)
+res.equating.sirt <- equating.sirt(fd)
+res.equating.sirt$rangkuman
+
+res.equating.irt <- equating.irt(fd)
+res.equating.irt
+
+res.equating.sns <- equating.sns(fd)
+res.equating.sns
+
+res.equating.plink <- equating.plink(fd)
+res.equating.plink$rangkuman
+
+res.equating.direc <- equating.direc(fd, purification = TRUE)
+res.equating.direc$rangkuman

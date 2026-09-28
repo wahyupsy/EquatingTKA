@@ -1,281 +1,83 @@
-#' Three-Year IRT Equating with Anchor Item Purification
-#'
-#' Performs 1PL IRT equating between 2024-2025 and 2024-2026
-#' using Mean-Mean, Haebara, and Stocking-Lord methods.
-#'
-#' @param fd Folder containing item parameter files.
-#' @param threshold Maximum absolute difference in item difficulty
-#'   allowed during anchor purification.
-#'
-#' @return A data frame containing the equating results for
-#'   2024-2025 and 2024-2026.
-#'
+#' Three-Year IRT Equating with Anchor Item Purification (SNSequate)
+#' @param fd Folder path containing item parameter files.
+#' @param threshold Maximum displacement threshold allowed for anchor items.
+#' @param purification Logical. Perform anchor item purification if TRUE.
+#' @return A list containing summary table, anchor details, and raw irt.link models.
 #' @importFrom SNSequate irt.link
 #' @export
-equating.sns <- function(
-    fd,
-    threshold = 0.5
-) {
+equating.sns <- function(fd, threshold = 0.5, purification = TRUE) {
 
-  list.param.file <- list.files(
-    path = fd,
-    pattern = "item",
-    full.names = TRUE
-  )
+  list.param.file <- list.files(path = fd, pattern = "item", full.names = TRUE)
+  jenjang <- c("SD", "SMP"); mapel <- c("Lit", "Num")
 
-  jenjang <- c("SD", "SMP")
-  mapel <- c("Lit", "Num")
+  hasil_equating <- data.frame()
+  list.anchor <- list(); hasil.2425 <- list(); hasil.2426 <- list()
 
-  hasil <- list()
-  no <- 1
-
-  clean_param_df <- function(df) {
-
-    df$MEASURE <- as.numeric(
-      as.character(df$MEASURE)
-    )
-
-    na.omit(
-      data.frame(
-        item = as.character(df$NAME),
-        param = df$MEASURE,
-        stringsAsFactors = FALSE
-      )
-    )
-  }
-
-  process_pair <- function(
-      df1,
-      df2,
-      nama_pasang,
-      label_kombinasi
-  ) {
-
-    common_items <- intersect(
-      df1$item,
-      df2$item
-    )
-
-    n_awal <- length(common_items)
-
-    if (n_awal < 2) {
-
-      return(
-        data.frame(
-          Equating = nama_pasang,
-          Kombinasi = label_kombinasi,
-          Anchor_Awal = n_awal,
-          Anchor_Bersih = n_awal,
-          Mean.Mean = NA,
-          Haebara = NA,
-          Stocking.Lord = NA,
-          stringsAsFactors = FALSE
-        )
-      )
-    }
-
-    d1 <- df1[
-      df1$item %in% common_items,
-    ]
-
-    d2 <- df2[
-      df2$item %in% common_items,
-    ]
-
-    d1 <- d1[
-      order(d1$item),
-    ]
-
-    d2 <- d2[
-      order(d2$item),
-    ]
-
-    diff_b <- abs(
-      d1$param - d2$param
-    )
-
-    keep <- diff_b <= threshold
-
-    d1_clean <- d1[keep, ]
-    d2_clean <- d2[keep, ]
-
-    n_clean <- nrow(d1_clean)
-
-    if (n_clean < 2) {
-
-      return(
-        data.frame(
-          Equating = nama_pasang,
-          Kombinasi = label_kombinasi,
-          Anchor_Awal = n_awal,
-          Anchor_Bersih = n_clean,
-          Mean.Mean = NA,
-          Haebara = NA,
-          Stocking.Lord = NA,
-          stringsAsFactors = FALSE
-        )
-      )
-    }
-
-    parm_df <- data.frame(
-      aJj = rep(1, n_clean),
-      bJj = d1_clean$param,
-      cJj = rep(0, n_clean),
-      aIj = rep(1, n_clean),
-      bIj = d2_clean$param,
-      cIj = rep(0, n_clean)
-    )
-
-    res_link <- SNSequate::irt.link(
-      parm = parm_df,
-      common = 1:n_clean,
-      model = "1PL",
-      icc = "logistic",
-      D = 1.7
-    )
-
-    data.frame(
-      Equating = nama_pasang,
-      Kombinasi = label_kombinasi,
-      Anchor_Awal = n_awal,
-      Anchor_Bersih = n_clean,
-      Mean.Mean = round(
-        res_link$mm[2],
-        4
-      ),
-      Haebara = round(
-        res_link$Haebara[2],
-        4
-      ),
-      Stocking.Lord = round(
-        res_link$StockLord[2],
-        4
-      ),
-      stringsAsFactors = FALSE
-    )
-  }
+  sel_cols <- function(df) df[, c("NAME", "ENTRY", "MEASURE", "COUNT", "OBSMATCH")]
+  clean_df <- function(df) na.omit(data.frame(item = as.character(df$NAME), param = as.numeric(as.character(df$MEASURE)), se = df$ERROR, stringsAsFactors = FALSE))
 
   for (j in seq_along(jenjang)) {
-
     for (k in seq_along(mapel)) {
+      nm <- paste0(jenjang[j], "_", mapel[k])
+      cat("\n===== Processing:", nm, "=====\n")
 
-      nm <- paste0(
-        jenjang[j],
-        "_",
-        mapel[k]
-      )
+      f24K <- grep(mapel[k], grep(jenjang[j], grep("_24", list.param.file, value = TRUE), value = TRUE), value = TRUE)
+      f25K <- grep(mapel[k], grep(jenjang[j], grep("_25", list.param.file, value = TRUE), value = TRUE), value = TRUE)
+      f26K <- grep(mapel[k], grep(jenjang[j], grep("_26", list.param.file, value = TRUE), value = TRUE), value = TRUE)
 
-      cat(
-        "\n===== Processing:",
-        nm,
-        "=====\n"
-      )
+      par24 <- read.csv(f24K[1], skip = 1)
+      par.list <- list("25" = read.csv(f25K[1], skip = 1), "26" = read.csv(f26K[1], skip = 1))
+      par.24X <- clean_df(par24)
 
-      f24 <- grep(
-        "_24",
-        list.param.file,
-        value = TRUE
-      )
+      for (yr in c("25", "26")) {
+        p2 <- par.list[[yr]]
+        tahun <- paste0("2024-20", yr)
+        list.anchor[[paste0(nm, "24", yr)]] <- merge(sel_cols(par24), sel_cols(p2), by = "NAME", suffixes = c("24", yr))
 
-      f25 <- grep(
-        "_25",
-        list.param.file,
-        value = TRUE
-      )
+        d2X <- clean_df(p2)
+        common <- intersect(par.24X$item, d2X$item)
+        n_awal <- length(common)
 
-      f26 <- grep(
-        "_26",
-        list.param.file,
-        value = TRUE
-      )
+        d1 <- par.24X[par.24X$item %in% common, ]; d1 <- d1[order(d1$item), ]
+        d2 <- d2X[d2X$item %in% common, ];         d2 <- d2[order(d2$item), ]
 
-      f24K <- grep(
-        mapel[k],
-        grep(
-          jenjang[j],
-          f24,
-          value = TRUE
-        ),
-        value = TRUE
-      )
+        # Purifikasi Anchor Item (Drift/Outlier Filter)
+        sepooled <- sqrt(d1$se^2 + d2$se^2)
+        displace <- d1$param - d2$param
+        flag <- abs(displace) > (2 * sepooled) & abs(displace) > threshold
+        keep <- if (purification) !flag else rep(TRUE, length(flag))
 
-      f25K <- grep(
-        mapel[k],
-        grep(
-          jenjang[j],
-          f25,
-          value = TRUE
-        ),
-        value = TRUE
-      )
+        d1_clean <- d1[keep, ]; d2_clean <- d2[keep, ]
+        n_clean <- nrow(d1_clean)
 
-      f26K <- grep(
-        mapel[k],
-        grep(
-          jenjang[j],
-          f26,
-          value = TRUE
-        ),
-        value = TRUE
-      )
+        res_link <- NULL; mm <- hb <- sl <- NA_real_
 
-      par24 <- read.csv(
-        f24K[1],
-        skip = 1
-      )
+        if (n_clean >= 2) {
+          parm_df <- data.frame(aJj = 1, bJj = d1_clean$param, cJj = 0, aIj = 1, bIj = d2_clean$param, cIj = 0)
+          res_link <- SNSequate::irt.link(parm = parm_df, common = 1:n_clean, model = "1PL", icc = "logistic", D = 1.7)
+          mm <- round(res_link$mm[2], 4)
+          hb <- round(res_link$Haebara[2], 4)
+          sl <- round(res_link$StockLord[2], 4)
+        }
 
-      par25 <- read.csv(
-        f25K[1],
-        skip = 1
-      )
+        # Simpan Objek Model Utuh
+        if (yr == "25") hasil.2425[[nm]] <- res_link else hasil.2426[[nm]] <- res_link
 
-      par26 <- read.csv(
-        f26K[1],
-        skip = 1
-      )
-
-      par.24X <- clean_param_df(
-        par24
-      )
-
-      par.25X <- clean_param_df(
-        par25
-      )
-
-      par.26X <- clean_param_df(
-        par26
-      )
-
-      res_2425 <- process_pair(
-        par.24X,
-        par.25X,
-        "2024-2025",
-        nm
-      )
-
-      res_2426 <- process_pair(
-        par.24X,
-        par.26X,
-        "2024-2026",
-        nm
-      )
-
-      hasil[[no]] <- rbind(
-        res_2425,
-        res_2426
-      )
-
-      no <- no + 1
+        # Gabung Ringkasan Hasil Equating
+        hasil_equating <- rbind(hasil_equating, data.frame(
+          Equating = tahun, Kombinasi = nm, Anchor_Awal = n_awal, Anchor_Bersih = n_clean,
+          Mean.Mean = mm, Haebara = hb, Stocking.Lord = sl, stringsAsFactors = FALSE
+        ))
+      }
     }
   }
 
-   res<- do.call(
-    rbind,
-    hasil
-  )
-    print(res)
-  do.call(
-    rbind,
-    hasil
-  )
+  print(hasil_equating, row.names = FALSE)
+
+  # Mengembalikan output list 3 elemen
+  return(list(
+    hasil_equating = hasil_equating,
+    list.anchor = list.anchor,
+    hasil.link = list(hasil.2425 = hasil.2425, hasil.2426 = hasil.2426)
+  ))
 }

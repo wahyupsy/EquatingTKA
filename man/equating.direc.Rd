@@ -4,15 +4,19 @@
 \alias{equating.direc}
 \title{Equating IRT menggunakan equateIRT::direc}
 \usage{
-equating.direc(fd, threshold = 0.5)
+equating.direc(fd, threshold = 0.5, purification = TRUE)
 }
 \arguments{
 \item{fd}{Folder yang berisi file parameter item.}
 
-\item{threshold}{Batas selisih parameter untuk purification anchor.}
+\item{threshold}{Batas praktis displacement (logit) untuk purification anchor.}
+
+\item{purification}{TRUE = buang item anchor yang displace (2*SE & > threshold);
+FALSE = pakai semua common item tanpa purifikasi.}
 }
 \value{
-List: hasil[\link{1}] rangkuman, hasil[\link{2}] hasil detail.
+List: hasil[\link{1}] rangkuman, hasil[\link{2}] list.anchor (gabungan item per pasangan),
+hasil[\link{3}] hasil detail.
 }
 \description{
 Equating IRT menggunakan equateIRT::direc

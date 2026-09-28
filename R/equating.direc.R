@@ -1,16 +1,18 @@
 #' Equating IRT menggunakan equateIRT::direc
 #'
 #' @param fd Folder yang berisi file parameter item.
-#' @param threshold Batas selisih parameter untuk purification anchor.
-#' @return List: hasil[[1]] rangkuman, hasil[[2]] hasil detail.
+#' @param threshold Batas praktis displacement (logit) untuk purification anchor.
+#' @param purification TRUE = buang item anchor yang displace (2*SE & > threshold);
+#'   FALSE = pakai semua common item tanpa purifikasi.
+#' @return List: hasil[[1]] rangkuman, hasil[[2]] list.anchor (gabungan item per pasangan),
+#'   hasil[[3]] hasil detail.
 #' @importFrom equateIRT modIRT direc eqc
 #' @export
-equating.direc <- function(fd, threshold = 0.5) {
+equating.direc <- function(fd, threshold = 0.5, purification = TRUE) {
 
-   require(equateIRT)
+  require(equateIRT)
 
-
-   list.param.file <- list.files(path = fd, pattern = "item", full.names = TRUE)
+  list.param.file <- list.files(path = fd, pattern = "item", full.names = TRUE)
   jenjang <- c("SD", "SMP")
   mapel <- c("Lit", "Num")
   hasil_equating <- data.frame(
@@ -25,6 +27,9 @@ equating.direc <- function(fd, threshold = 0.5) {
   )
   hasil.2425 <- list()
   hasil.2426 <- list()
+  list.anchor <- list()
+
+  sel_cols <- function(df) df[, c("NAME", "ENTRY", "MEASURE", "COUNT", "OBSMATCH")]
 
   process_pair <- function(par.1, par.2, tahun, nm) {
     common_items <- intersect(par.1$item, par.2$item)
@@ -33,7 +38,22 @@ equating.direc <- function(fd, threshold = 0.5) {
     data2 <- par.2[par.2$item %in% common_items, , drop = FALSE]
     data1 <- data1[order(data1$item), , drop = FALSE]
     data2 <- data2[order(data2$item), , drop = FALSE]
-    keep <- abs(data1$param - data2$param) <= threshold
+
+    sepooled <- sqrt(data1$se^2 + data2$se^2)
+    displace <- data1$param - data2$param
+    flag <- abs(displace) > 2 * sepooled & abs(displace) > threshold
+
+    keep <- if (purification) !flag else rep(TRUE, length(flag))
+
+    displace_tbl <- data.frame(
+      item = data1$item,
+      param1 = data1$param,
+      param2 = data2$param,
+      displace = displace,
+      sepooled = sepooled,
+      flag = flag
+    )
+
     data1 <- data1[keep, , drop = FALSE]
     data2 <- data2[keep, , drop = FALSE]
     n_bersih <- nrow(data1)
@@ -54,6 +74,7 @@ equating.direc <- function(fd, threshold = 0.5) {
         par.1 = data1,
         par.2 = data2,
         common.item = data1$item,
+        displace_tbl = displace_tbl,
         model = NULL,
         Mean.Mean = NULL,
         Haebara = NULL,
@@ -66,27 +87,11 @@ equating.direc <- function(fd, threshold = 0.5) {
     rownames(mat1) <- data1$item
     rownames(mat2) <- data2$item
 
-    mod_data <- equateIRT::modIRT(
-      coef = list(mat1, mat2),
-      var = NULL,
-      display = FALSE
-    )
+    mod_data <- equateIRT::modIRT(coef = list(mat1, mat2), var = NULL, display = FALSE)
 
-    coef.MM <- equateIRT::direc(
-      mods = mod_data,
-      which = c(1, 2),
-      method = "mean-mean"
-    )
-    coef.HB <- equateIRT::direc(
-      mods = mod_data,
-      which = c(1, 2),
-      method = "Haebara"
-    )
-    coef.SL <- equateIRT::direc(
-      mods = mod_data,
-      which = c(1, 2),
-      method = "Stocking-Lord"
-    )
+    coef.MM <- equateIRT::direc(mods = mod_data, which = c(1, 2), method = "mean-mean")
+    coef.HB <- equateIRT::direc(mods = mod_data, which = c(1, 2), method = "Haebara")
+    coef.SL <- equateIRT::direc(mods = mod_data, which = c(1, 2), method = "Stocking-Lord")
 
     eq.MM <- equateIRT::eqc(coef.MM)
     eq.HB <- equateIRT::eqc(coef.HB)
@@ -112,6 +117,7 @@ equating.direc <- function(fd, threshold = 0.5) {
       par.1 = data1,
       par.2 = data2,
       common.item = data1$item,
+      displace_tbl = displace_tbl,
       model = mod_data,
       Mean.Mean = coef.MM,
       Haebara = coef.HB,
@@ -137,17 +143,24 @@ equating.direc <- function(fd, threshold = 0.5) {
         par25 <- read.csv(f25K[1], skip = 1, stringsAsFactors = FALSE)
         par26 <- read.csv(f26K[1], skip = 1, stringsAsFactors = FALSE)
 
+        # daftar gabungan item anchor (versi lengkap kolom, sebelum purifikasi)
+        list.anchor[[paste0(nm, "2425")]] <- merge(sel_cols(par24), sel_cols(par25), by = "NAME", suffixes = c("24", "25"))
+        list.anchor[[paste0(nm, "2426")]] <- merge(sel_cols(par24), sel_cols(par26), by = "NAME", suffixes = c("24", "26"))
+
         par.24X <- data.frame(
           item = as.character(par24$NAME),
-          param = as.numeric(as.character(par24$MEASURE))
+          param = as.numeric(as.character(par24$MEASURE)),
+          se = as.numeric(as.character(par24$ERROR))
         )
         par.25X <- data.frame(
           item = as.character(par25$NAME),
-          param = as.numeric(as.character(par25$MEASURE))
+          param = as.numeric(as.character(par25$MEASURE)),
+          se = as.numeric(as.character(par25$ERROR))
         )
         par.26X <- data.frame(
           item = as.character(par26$NAME),
-          param = as.numeric(as.character(par26$MEASURE))
+          param = as.numeric(as.character(par26$MEASURE)),
+          se = as.numeric(as.character(par26$ERROR))
         )
 
         res2425 <- process_pair(par.24X, par.25X, "2024-2025", nm)
@@ -156,11 +169,7 @@ equating.direc <- function(fd, threshold = 0.5) {
         hasil.2425[[nm]] <- res2425
         hasil.2426[[nm]] <- res2426
 
-        hasil_equating <- rbind(
-          hasil_equating,
-          res2425$summary,
-          res2426$summary
-        )
+        hasil_equating <- rbind(hasil_equating, res2425$summary, res2426$summary)
 
         cat("✓ Selesai\n")
       }, error = function(e) {
@@ -176,6 +185,7 @@ equating.direc <- function(fd, threshold = 0.5) {
 
   hasil <- list(
     rangkuman = hasil_equating,
+    list.anchor = list.anchor,
     detail = list(
       hasil.2425 = hasil.2425,
       hasil.2426 = hasil.2426
