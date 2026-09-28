@@ -15,8 +15,12 @@ equating.direc(fd, threshold = 0.5, purification = TRUE)
 FALSE = pakai semua common item tanpa purifikasi.}
 }
 \value{
-List: hasil[\link{1}] rangkuman, hasil[\link{2}] list.anchor (gabungan item per pasangan),
-hasil[\link{3}] hasil detail.
+List dengan elemen:
+\describe{
+\item{rangkuman}{data.frame konstanta equating (Mean-Mean, Haebara, Stocking-Lord) per pasangan tahun dan kombinasi.}
+\item{list.anchor}{list gabungan item anchor per pasangan tahun (sebelum purifikasi).}
+\item{detail}{list hasil detail \code{hasil.2425} dan \code{hasil.2426}.}
+}
 }
 \description{
 Equating IRT menggunakan equateIRT::direc
