@@ -18,7 +18,7 @@ usethis::use_description()
 
 devtools::document()
 devtools::install()
-
+library(EquatingTKA)
 
 install.packages("remotes")
 remotes::install_github("wahyupsy/EquatingTKA")
@@ -32,7 +32,6 @@ fd <- "D:/OneDrive/Bahan Analisis/Tabel Parameter"
 
 readLines("NAMESPACE")
 
-packageVersion("EquatingTKA")
 find.package("EquatingTKA")
 getNamespaceExports("EquatingTKA")
 
