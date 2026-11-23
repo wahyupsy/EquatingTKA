@@ -158,3 +158,113 @@ equating.sirt <- function(fd, threshold = 0.5, purification = TRUE) {
     detail = list(hasil.2425 = hasil.2425, hasil.2426 = hasil.2426)
   ))
 }
+
+
+#-------------- Ko
+
+# Ambil data SMPNum 24 dan 26
+par24_smpnum <- read.csv(par_files.24[4])  # SMPNum_24
+par26_smpnum <- read.csv(par_files.26[4])  # SMPNum_26
+
+# ENTRY anchor items dari tabel Anda
+anchor_entries <- c(11, 169, 110, 5, 154, 67, 202, 52, 119, 40, 
+                    148, 97, 48, 150, 207, 215, 91, 2, 112, 46, 
+                    123, 134, 189, 149)
+
+# Filter hanya anchor items
+d24_anchor <- par24_smpnum[par24_smpnum$ENTRY %in% anchor_entries, ]
+d26_anchor <- par26_smpnum[par26_smpnum$ENTRY %in% anchor_entries, ]
+
+# Hitung percent correct
+d24_anchor$pct_24 <- (d24_anchor$SCORE / d24_anchor$COUNT) * 100
+d26_anchor$pct_26 <- (d26_anchor$SCORE / d26_anchor$COUNT) * 100
+
+# Bandingkan
+komparasi_pct <- data.frame(
+  ENTRY = d24_anchor$ENTRY,
+  NAME = d24_anchor$NAME,
+  MEASURE_24 = round(d24_anchor$MEASURE, 2),
+  MEASURE_26 = d26_anchor$MEASURE[match(d24_anchor$ENTRY, d26_anchor$ENTRY)],
+  PCT_24 = round(d24_anchor$pct_24, 2),
+  PCT_26 = round(d26_anchor$pct_26[match(d24_anchor$ENTRY, d26_anchor$ENTRY)], 2)
+)
+
+komparasi_pct
+
+
+
+
+
+
+
+# ------------------------------- Membandingkan Percent Correct -------------------------------
+
+
+
+
+# Buat percent correct per base
+pct_correct <- data.frame()
+
+bases <- c("SDLit", "SDNum", "SMPLit", "SMPNum")
+
+par_files.24 <- list.files(fd_par, pattern = "*24", full.names = TRUE)
+par_files.25 <- list.files(fd_par, pattern = "*25", full.names = TRUE)
+par_files.26 <- list.files(fd_par, pattern = "*26.*unequated", full.names = TRUE)
+
+pct_correct <- data.frame()
+
+for (i in seq_along(par_files.24)) {
+  base <- bases[i]
+  
+  par24 <- read.csv(par_files.24[i])
+  par25 <- read.csv(grep(base, par_files.25, value = TRUE)[1])
+  par26 <- read.csv(grep(base, par_files.26, value = TRUE)[1])
+  
+  # Hitung percent correct
+  par24$pct_correct <- (par24$SCORE / par24$COUNT) * 100
+  par25$pct_correct <- (par25$SCORE / par25$COUNT) * 100
+  par26$pct_correct <- (par26$SCORE / par26$COUNT) * 100
+  
+  # Match items untuk setiap pasangan
+  for (year in c(25, 26)) {
+    if (year == 25) {
+      par_target <- par25
+    } else {
+      par_target <- par26
+    }
+    
+    idx24 <- match(par_target$NAME, par24$NAME)
+    matched_idx <- !is.na(idx24)
+    
+    d1 <- par24[idx24[matched_idx], ]
+    d2 <- par_target[matched_idx, ]
+    
+    # Tambah data 24
+    pct_correct <- rbind(
+      pct_correct,
+      data.frame(
+        base = base,
+        pair = paste0("24-", year),
+        form = "24",
+        n = nrow(d1),
+        mean_pct = round(mean(d1$pct_correct, na.rm = TRUE), 2),
+        sd_pct = round(sd(d1$pct_correct, na.rm = TRUE), 2)
+      )
+    )
+    
+    # Tambah data target
+    pct_correct <- rbind(
+      pct_correct,
+      data.frame(
+        base = base,
+        pair = paste0("24-", year),
+        form = year,
+        n = nrow(d2),
+        mean_pct = round(mean(d2$pct_correct, na.rm = TRUE), 2),
+        sd_pct = round(sd(d2$pct_correct, na.rm = TRUE), 2)
+      )
+    )
+  }
+}
+
+pct_correct

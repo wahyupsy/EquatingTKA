@@ -91,9 +91,9 @@ equating.direc <- function(fd, threshold = 0.5, purification = TRUE) {
 
     mod_data <- equateIRT::modIRT(coef = list(mat1, mat2), var = NULL, display = FALSE)
 
-    coef.MM <- equateIRT::direc(mods = mod_data, which = c(1, 2), method = "mean-mean")
-    coef.HB <- equateIRT::direc(mods = mod_data, which = c(1, 2), method = "Haebara")
-    coef.SL <- equateIRT::direc(mods = mod_data, which = c(1, 2), method = "Stocking-Lord")
+    coef.MM <- equateIRT::direc(mods = mod_data, which = c(2, 1), method = "mean-mean")
+    coef.HB <- equateIRT::direc(mods = mod_data, which = c(2, 1), method = "Haebara")
+    coef.SL <- equateIRT::direc(mods = mod_data, which = c(2, 1), method = "Stocking-Lord")
 
     eq.MM <- equateIRT::eqc(coef.MM)
     eq.HB <- equateIRT::eqc(coef.HB)

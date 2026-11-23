@@ -108,7 +108,7 @@ equating.plink <- function(fd, threshold = 0.5, purification = TRUE) {
               poly.mod = list(pm, pm)
             )
 
-            out <- plink::plink(x, rescale = "MS", base.grp = 1, D = 1.7)
+            out <- plink::plink(x, rescale = "MM", base.grp = 1, D = 1)
             lp <- plink::link.pars(out)
             cons <- out$link@constants
 

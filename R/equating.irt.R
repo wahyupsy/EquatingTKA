@@ -110,9 +110,9 @@ equating.irt <- function(fd, threshold = 0.5, purification = TRUE) {
 
             mod <- equateIRT::modIRT(coef = list(mat1, mat2), var = NULL, display = FALSE)
 
-            sl <- summary(equateIRT::direc(mods = mod, which = c(1, 2), method = "Stocking-Lord"))$coef["B", "Estimate"]
-            mm <- summary(equateIRT::direc(mods = mod, which = c(1, 2), method = "mean-mean"))$coef["B", "Estimate"]
-            hb <- summary(equateIRT::direc(mods = mod, which = c(1, 2), method = "Haebara"))$coef["B", "Estimate"]
+            sl <- summary(equateIRT::direc(mods = mod, which = c(2, 1), method = "Stocking-Lord"))$coef["B", "Estimate"]
+            mm <- summary(equateIRT::direc(mods = mod, which = c(2, 1), method = "mean-mean"))$coef["B", "Estimate"]
+            hb <- summary(equateIRT::direc(mods = mod, which = c(2, 1), method = "Haebara"))$coef["B", "Estimate"]
           }
 
           res <- list(

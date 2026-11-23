@@ -1,0 +1,264 @@
+---
+title: "The R Package equateIRT: A Tutorial"
+output: 
+  rmarkdown::html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    theme: spacelab
+    highlight: pygments
+vignette: >
+  %\VignetteIndexEntry{The R Package equateIRT: A Tutorial}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+# Functionalities
+
+The equateIRT package computes:
+
+* __Direct equating coefficients__ (between two forms with common items).
+* __Chain equating coefficients__ (through a chain of forms with common items in pairs).
+* __Average (bisector) equating coefficients__ (between two forms connected through more than one path).
+* __Equated scores__ with __true score equating__ and __observed score equating__ methods.
+* __Standard errors__ of all equating coefficients and equated scores.
+* __Test for DIF__ and __tests for drifts__. 
+
+# Data preparation
+
+Load the package equateIRT and the data
+
+```{r}
+library("equateIRT")
+data("data2pl", package = "equateIRT")
+```
+
+Estimate a two parameter logistic model for 5 data sets with the R package mirt
+
+```{r, message=FALSE, results='hide'}
+library("mirt")
+m1 <- mirt(data2pl[[1]], SE = TRUE)
+m2 <- mirt(data2pl[[2]], SE = TRUE)
+m3 <- mirt(data2pl[[3]], SE = TRUE)
+m4 <- mirt(data2pl[[4]], SE = TRUE)
+m5 <- mirt(data2pl[[5]], SE = TRUE)
+```
+
+Create an object of class `modIRT` (since package versione 2.5.0 it is possible to skip the import.mirt function)
+
+```{r}
+mlist<- list(m1, m2, m3, m4, m5)
+test <- paste("test", 1:5, sep = "")
+mod2pl <- modIRT(est.mods = mlist, names = test, display = FALSE)
+coef(mod2pl$test1)[1:5]
+```
+
+The linkage plan
+
+```{r}
+lplan<-linkp(mods = mod2pl)
+lplan
+```
+
+A graphic of the linkage plan with package `sna`
+
+```{r, message=FALSE, fig.cap="Linkage plan",fig.width=3.5,fig.height=3}
+library(sna)
+par(mar=c(0, 0, 0, 0))
+set.seed(6)
+gplot(lplan, displaylabels = TRUE,  vertex.sides = 4, vertex.cex = 5, vertex.rot =45,  usearrows = FALSE, label.pos = 5, label.cex = 1, vertex.col = 0)
+```
+
+# Direct equating coefficients
+ 
+Estimation of direct equating coefficients between Forms 1 and 2 using
+the mean-mean method.
+
+__NOTE: Item parameters are converted to the scale of Form 2.__
+
+
+```{r}
+l12 <- direc(mods = mod2pl, which = c(1,2), method = "mean-mean")
+l12
+summary(l12)
+```
+
+Estimation of all direct equating coefficients between forms with common
+items using the mean-mean method
+
+```{r}
+direclist2pl <- alldirec(mods = mod2pl, method = "mean-mean")
+direclist2pl
+```
+```{r}
+
+```
+
+Direct equating coefficients for Forms 1 and 2
+
+```{r}
+summary(direclist2pl, link="test1.test2")
+```
+
+# Chain equating coefficients
+
+Estimation of all chain equating coefficients of length 4
+
+```{r}
+cec4 <- chainec(r = 4, direclist = direclist2pl)
+cec4
+```
+
+Chain equating coefficients for path {1, 2, 3, 4} 
+
+```{r}
+summary(cec4, path="test1.test2.test3.test4")
+```
+
+Estimation of all chain equating coefficients of length 4
+from Form 1 to Form 4
+
+```{r}
+cec14 <- chainec(r = 4, direclist = direclist2pl, f1 = "test1", f2 = "test4")
+cec14
+summary(cec14)
+```
+
+Estimation of chain equating coefficient for path {1, 5, 4}
+
+```{r}
+pth <- paste("test", c(1,5,4), sep = "")
+chainec154 <- chainec(direclist = direclist2pl, pths = pth)
+summary(chainec154)
+```
+
+__NOTE: Item parameters are converted to the scale of Form 4.__
+
+# Average equating coefficients
+
+When two forms are linked through more than one path, the equating coefficients can be averaged
+using the bisector method.
+Estimation of bisector equating coefficients:
+
+```{r}
+ecall <- c(cec14, chainec154)
+fec <- bisectorec(ecall = ecall, weighted = TRUE, unweighted = TRUE)
+fec
+summary(fec)
+```
+
+Extract the equating coefficients
+
+```{r}
+ eqc(fec)
+```
+ 
+Extract item parameters of two forms being equated in the original scale 
+and item parameters of the first form converted to the scale of the second form.
+
+```{r}
+itm(fec, bistype = "weighted")
+```
+
+# Equated scores
+
+Equated scores with the true score equating method
+
+```{r}
+score(fec, bistype = "weighted")
+```
+
+Equated scores with the observed score equating method
+
+```{r}
+score(fec, method = "OSE", bistype = "weighted")
+```
+
+A comparison of equated scores obtained with 2 different chains,
+bisector and weighted bisector methods.
+
+```{r}
+score(chainec154, scores = 17)
+score(cec4, path = "test1.test2.test3.test4", scores = 17)
+score(fec, bistype = "unweighted", scores = 17)
+score(fec, bistype = "weighted", scores = 17)
+```
+
+# Test for DIF
+
+Load the data
+
+```{r}
+data(dataDIF)
+```
+
+Create a dataset for each group and estimate a 2PL model for each group using the R package mirt
+
+```{r, message=FALSE, results='hide'}
+library(mirt)
+data1 <- dataDIF[dataDIF$group == 1, 1:20]
+data2 <- dataDIF[dataDIF$group == 2, 1:20]
+data3 <- dataDIF[dataDIF$group == 3, 1:20]
+mod1 <- mirt(data1, SE = TRUE)
+mod2 <- mirt(data2, SE = TRUE)
+mod3 <- mirt(data3, SE = TRUE)
+```
+
+Perform the test for DIF on two groups
+
+```{r}
+res_diftest2 <- dif.test(est.mods = list(mod1, mod2))
+res_diftest2
+```
+
+Perform the test for DIF on three groups
+
+```{r}
+res_diftest3 <- dif.test(est.mods = list(mod1, mod2, mod3))
+res_diftest3
+```
+
+It is possible to change the reference group, the equating method used, and to apply purification.
+
+```{r}
+res_diftest3 <- dif.test(est.mods = list(mod1, mod2, mod3), reference = 2, 
+                         method = "Haebara", purification = TRUE)
+res_diftest3
+```
+
+
+# Tests for drifts
+
+The identity test performs a statistical test to verify if the chain equating coefficients from one form to itself are A=1 and B=0.
+
+
+```{r}
+data(est3pl)
+test <- paste("test", 1:5, sep = "")
+mod3pl <- modIRT(coef = est3pl$coef, var = est3pl$var, names = test, display = FALSE)
+direclist3pl <- alldirec(mods = mod3pl, method = "Haebara")
+pth3 <- paste("test", c(1:5,1), sep = "")
+chainec_circle <- chainec(direclist = direclist3pl, pths = pth3)
+summary(chainec_circle)
+id.test(chainec_circle)
+```
+
+The null hypothesis A=1 and B=0 is not rejected.
+
+
+It is also possible to performs a statistical test to verify if the chain equating coefficients that link the same two forms are equal.
+
+In the following example test 1 and 5 are linked through two different paths giving
+two different pairs of equating coefficients.
+The example uses the 3PL models and the Haebara method, though other options are possible.
+
+```{r}
+pth3 <- paste("test", 1:5, sep = "")
+chainec3 <- chainec(direclist = direclist3pl, pths = pth3)
+ecall <- c(chainec3, direclist3pl["test1.test5"])
+summary(chainec3)
+summary(direclist3pl$test1.test5)
+sd.test(ecall)
+```
+
+The null hypothesis of equality of the equating coefficients is not rejected.
